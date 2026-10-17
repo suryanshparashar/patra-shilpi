@@ -71,6 +71,7 @@ class AdminSession(BaseModel):
 
 class StatsOut(BaseModel):
     registered_users: int
+    registered_admins: int
     guest_users: int  # guests who spent their free run, all-time
     resume_runs: int
     cover_letter_runs: int

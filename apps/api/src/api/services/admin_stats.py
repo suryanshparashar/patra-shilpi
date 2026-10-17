@@ -7,7 +7,7 @@ from beanie import PydanticObjectId
 from api.config import settings
 from api.schemas import AdminUserRow, StatsOut
 from api.services.pagination import encode_cursor, older_than
-from db import COUNTERS_ID, AdminStats, GuestUsage, LlmUsage, User
+from db import COUNTERS_ID, Admin, AdminStats, GuestUsage, LlmUsage, User
 
 # --- aggregation pipelines (kept separate so they can be checked on their own) ----------------
 
@@ -95,6 +95,7 @@ async def compute_stats() -> StatsOut:
     output_tokens = int(llm.get("output_tokens", 0))
     return StatsOut(
         registered_users=await User.count(),
+        registered_admins=await Admin.count(),
         guest_users=guests_total,
         resume_runs=runs.get("resume", 0),
         cover_letter_runs=runs.get("cover_letter", 0),

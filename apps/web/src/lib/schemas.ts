@@ -263,6 +263,7 @@ export type AdminSession = z.infer<typeof adminSessionSchema>;
 
 export const statsSchema = z.object({
   registered_users: z.number(),
+  registered_admins: z.number(),
   guest_users: z.number(),
   resume_runs: z.number(),
   cover_letter_runs: z.number(),

@@ -160,6 +160,7 @@ export function AdminDashboard() {
         >
           <section aria-label="Totals" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Registered users" value={number(stats.registered_users)} />
+            <StatCard label="Registered admins" value={number(stats.registered_admins)} />
             <StatCard
               label="Guest users"
               value={number(stats.guest_users)}
