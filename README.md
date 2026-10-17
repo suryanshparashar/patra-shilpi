@@ -1,6 +1,9 @@
 <div align="center">
 
-# PatraShilpi
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/patrashilpi-lockup-dark.svg">
+  <img src="docs/brand/patrashilpi-lockup-light.svg" alt="PatraShilpi" width="360">
+</picture>
 
 **Shaped to the job. Never a fact invented.**
 
@@ -82,25 +85,25 @@ facts**. Every rewrite is checked against your original resume before you see it
 
 ## How it works
 
-Customization is a **LangGraph supervisor-and-workers graph**. An LLM supervisor decides which
-specialist runs next, one per turn. Deterministic routing rules decide which specialists are
-*allowed* to run, so the supervisor can never skip a step's inputs, repeat finished work, or
-loop forever.
+Customization is a **LangGraph supervisor-and-workers graph**. The order of the specialists is
+**fixed in code** (so no model call is spent deciding it), and each runs once per turn. The LLM
+supervisor is consulted for the one real judgement: when the fact-check flags the draft, should it
+be sent back for a revision? A clean run therefore costs **6 model requests** (5 chat plus 1
+embedding); a revision adds 3, and a cover letter after a run adds 1.
 
 ```mermaid
 flowchart LR
-    S{{"🧠 Supervisor<br/><sub>LLM: picks the next step</sub>"}}
+    S{{"🧠 Supervisor<br/><sub>fixed order; LLM rules on revisions</sub>"}}
 
     S --> JD["JD Analyzer<br/><sub>requirements and keywords</sub>"]
     S --> RS["Resume Structurer<br/><sub>PDF text to structured data</sub>"]
-    S --> MS["Match Scorer<br/><sub>embeddings, before and after</sub>"]
     S --> SC["Section Customizer<br/><sub>rewrites the selected sections</sub>"]
     S --> GR["Fact-Check Guardrail<br/><sub>flags invented claims</sub>"]
-    S --> KG["Keyword Gap<br/><sub>what's still missing</sub>"]
-    S --> ATS["ATS Evaluator<br/><sub>0 to 100 plus fixes</sub>"]
+    S --> EV["Evaluator<br/><sub>missing keywords and ATS 0 to 100</sub>"]
+    S --> MS["Match Scorer<br/><sub>one embedding call, before and after</sub>"]
     S --> CL["Cover Letter<br/><sub>on demand</sub>"]
 
-    JD & RS & MS & SC & GR & KG & ATS & CL -.->|report back| S
+    JD & RS & SC & GR & EV & MS & CL -.->|report back| S
     GR ==>|issues found, 1 revision| SC
 ```
 
@@ -112,7 +115,7 @@ flowchart LR
 4. **Structured outputs everywhere.** Every agent returns schema-validated JSON (Pydantic), so the UI never parses free text. A code-level safety net also keeps the original section if a rewrite ever drops or adds a whole role.
 5. **Resilience.** Gemini calls retry on rate limits, server errors and timeouts (3 attempts, exponential backoff with jitter). A step that still fails is recorded, and the rest of the run carries on, so you get **partial results** instead of a blank error page.
 
-All eight system prompts are versioned plain-text files in
+All the system prompts are versioned plain-text files in
 [`packages/agents/src/agents/prompts/`](packages/agents/src/agents/prompts/).
 
 **One request, end to end**
@@ -154,7 +157,7 @@ flowchart TB
     subgraph API["FastAPI (Python 3.12)"]
         R["/api/v1 routers<br/>customize · cover-letter · auth · history · admin"]
         SV["Services<br/>PDF parsing · guest gate · JWT and refresh · rate limits · usage"]
-        AG["packages/agents<br/>LangGraph supervisor + 8 workers"]
+        AG["packages/agents<br/>LangGraph supervisor + 7 workers"]
         DB["packages/db<br/>Beanie ODM models"]
     end
 
@@ -202,15 +205,19 @@ packages can never drift to different dependency versions.
 
 | Purpose | Provider | Model | Configured by |
 |---|---|---|---|
-| All 8 agents (one model for everything) | Google Gemini | `gemini-2-flash-lite` (current setup) | `GEMINI_MODEL` (required, no default) |
+| All chat agents (one model for everything) | Google Gemini | `gemini-2-flash-lite` (current setup) | `GEMINI_MODEL` (required, no default) |
 | Match score embeddings | Google Gemini | `gemini-embedding-001` | `GEMINI_EMBEDDING_MODEL` |
 
 The chat model is deliberately configured only through the environment, so you can switch to
-any Gemini model your key has access to without touching code. Each run makes roughly 15 to 20
-Gemini calls: about half are supervisor decisions, the rest are the eight specialists and two
-embedding calls.
+any Gemini model your key has access to without touching code. A clean run makes **6 Gemini
+requests** (JD analysis, resume structuring, customizing, fact-check, keywords and ATS in one
+call, and one embedding call for both match scores). A revision adds 3, and a cover letter adds 1.
 
 ## Getting started
+
+> **For evaluators:** open [`/qa`](https://project-subdomain.mydomain.com/qa) to be signed in
+> as the test user `qa-test-001` instantly, with no form. You can also try one run as a guest,
+> or register your own account.
 
 ### Prerequisites
 
@@ -279,6 +286,7 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | Variable | Required | Default | Description |
 |---|:---:|---|---|
 | `ENVIRONMENT` | | `development` | Shown by the healthcheck |
+| `DEVLOG` | | auto | Step-by-step `[API]` `[AGENT]` `[WORKER]` `[LLM]` `[EMBEDDINGS]` lines in the API console. Empty: on in development, off in production |
 | `CORS_ORIGINS` | | `["http://localhost:3000"]` | JSON list of allowed web origins |
 | `MONGODB_URI` | ✅ | | MongoDB connection string |
 | `MONGODB_DB` | | `resume_customizer_dev` | Database name |
@@ -315,6 +323,7 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | `COOKIE_SECURE` | | `false` | `true` in production (HTTPS) |
 | `COOKIE_SAMESITE` | | `lax` | `lax`, `strict` or `none` |
 | `RATE_LIMIT_PER_HOUR` | | `10` | Customizations and cover letters per user per hour (each) |
+| `QA_LOGIN_USERNAME` | | | Existing account that `/qa` signs visitors into (empty disables `/qa`) |
 
 </details>
 

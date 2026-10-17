@@ -1,0 +1,35 @@
+[project]
+name = "resume-customizer"
+version = "0.1.0"
+description = "Resume Customizer monorepo (uv workspace root)"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+default-groups = ["dev"]
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/db", "packages/agents"]
+
+[tool.uv.sources]
+api = { workspace = true }
+db = { workspace = true }
+agents = { workspace = true }
+
+[dependency-groups]
+dev = ["ruff>=0.8", "mypy>=1.13"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["apps/api/src", "packages/db/src", "packages/agents/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["apps/api/src", "packages/db/src", "packages/agents/src"]
+explicit_package_bases = true
