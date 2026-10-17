@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
 import { BackendWarmup } from "@/components/BackendWarmup";
+import { NoticeBanner } from "@/components/NoticeBanner";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthProvider } from "@/context/auth-context";
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-stone-50 font-sans text-stone-900">
         <BackendWarmup />
+        <NoticeBanner />
         <AuthProvider>
           <RunProvider>
             <SiteHeader />

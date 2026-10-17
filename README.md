@@ -343,7 +343,8 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 
 **Web** (`apps/web/.env.local`): `NEXT_PUBLIC_API_URL` is the API origin *without* `/api/v1`
 (default `http://localhost:8000`). `NEXT_PUBLIC_DEMO_VIDEO_ID` is the YouTube video ID (or link)
-shown on `/demo-video`; leave it empty to show "coming soon". Both are baked in at build time.
+shown on `/demo-video`; leave it empty to show "coming soon". `NEXT_PUBLIC_NOTICE_BANNER=true`
+shows a dismissible site-wide notice banner. All three are baked in at build time.
 
 ## API reference
 

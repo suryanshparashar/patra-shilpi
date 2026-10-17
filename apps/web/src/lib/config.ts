@@ -3,6 +3,9 @@ const origin = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").repl
 /** Every backend route lives under /api/v1; the prefix exists only here, never in page URLs. */
 export const API_BASE_URL = `${origin}/api/v1`;
 
+/** Shows the site-wide notice banner (NEXT_PUBLIC_NOTICE_BANNER=true). */
+export const NOTICE_BANNER_ENABLED = process.env.NEXT_PUBLIC_NOTICE_BANNER === "true";
+
 /** The YouTube video on /demo-video, from NEXT_PUBLIC_DEMO_VIDEO_ID: a video ID or any common
  * YouTube link (watch, youtu.be, embed, shorts). Null when unset or unrecognised. */
 export const DEMO_VIDEO_ID = youTubeId(process.env.NEXT_PUBLIC_DEMO_VIDEO_ID);
