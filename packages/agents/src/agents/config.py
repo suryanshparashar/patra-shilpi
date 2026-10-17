@@ -26,3 +26,8 @@ class AgentSettings(BaseSettings):
     langsmith_tracing: bool = False
     langsmith_api_key: SecretStr | None = None
     langsmith_project: str = "patrashilpi"
+    # Region endpoint, e.g. https://apac.api.smith.langchain.com. Empty means the US default.
+    langsmith_endpoint: str | None = None
+    # Groups traces under an agent in LangSmith's Agents view.
+    langsmith_agent_id: str | None = None
+    langsmith_agent_environment: str | None = None

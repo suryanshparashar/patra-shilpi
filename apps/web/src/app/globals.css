@@ -3,3 +3,13 @@
 @theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
+
+/* Tailwind v4 resets buttons to the default arrow. Utilities such as disabled:cursor-not-allowed
+   live in a later layer, so disabled buttons still show the blocked cursor. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+}

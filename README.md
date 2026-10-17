@@ -307,6 +307,8 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | `LANGSMITH_TRACING` | | `false` | Turn LangSmith tracing on or off (same setup in dev and prod) |
 | `LANGSMITH_API_KEY` | | | LangSmith key |
 | `LANGSMITH_PROJECT` | | `patrashilpi` | LangSmith project name |
+| `LANGSMITH_AGENT_ID` · `LANGSMITH_AGENT_ENVIRONMENT` | | | Group traces under an agent in LangSmith's Agents view |
+| `LANGSMITH_ENDPOINT` | | US default | Your workspace's regional endpoint (e.g. `https://apac.api.smith.langchain.com`) |
 
 </details>
 
