@@ -10,7 +10,7 @@
 Paste a job description, upload your resume, and get a version tailored to that job.
 It is rewritten by a team of AI agents, fact-checked against your original, and scored before and after.
 
-[**Live demo**](https://project-subdomain.mydomain.com) · [API docs](https://api.project-subdomain.mydomain.com/api/v1/docs) · [Report a bug](https://github.com/suryanshparashar/innovista-assignment/issues)
+[**Live demo**](https://patrashilpi.suryanshparashar.com) · [Report a bug](https://github.com/suryanshparashar/patra-shilpi/issues)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-10b981.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776ab?logo=python&logoColor=white)
@@ -20,7 +20,7 @@ It is rewritten by a team of AI agents, fact-checked against your original, and 
 ![Gemini](https://img.shields.io/badge/LLM-Google%20Gemini-4285f4?logo=googlegemini&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb&logoColor=white)
 
-<img src="docs/screenshots/hero.png" alt="Original and customized resume side by side, with match and ATS scores" width="900">
+<img src="docs/screenshots/landing.png" alt="PatraShilpi landing page: Shaped to the job. Never a fact invented." width="900">
 
 </div>
 
@@ -205,7 +205,7 @@ packages can never drift to different dependency versions.
 
 | Purpose | Provider | Model | Configured by |
 |---|---|---|---|
-| All chat agents (one model for everything) | Google Gemini | `gemini-2-flash-lite` (current setup) | `GEMINI_MODEL` (required, no default) |
+| All chat agents (one model for everything) | Google Gemini | `gemini-flash-lite-latest` (current setup) | `GEMINI_MODEL` (required, no default) |
 | Match score embeddings | Google Gemini | `gemini-embedding-001` | `GEMINI_EMBEDDING_MODEL` |
 
 The chat model is deliberately configured only through the environment, so you can switch to
@@ -215,7 +215,7 @@ call, and one embedding call for both match scores). A revision adds 3, and a co
 
 ## Getting started
 
-> **For evaluators:** open [`/qa`](https://project-subdomain.mydomain.com/qa) to be signed in
+> **For evaluators:** open [`/qa`](https://patrashilpi.suryanshparashar.com/qa) to be signed in
 > as the test user `qa-test-001` instantly, with no form. You can also try one run as a guest,
 > or register your own account.
 
@@ -230,8 +230,8 @@ call, and one embedding call for both match scores). A revision adds 3, and a co
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/suryanshparashar/innovista-assignment.git
-cd innovista-assignment
+git clone https://github.com/suryanshparashar/patra-shilpi.git
+cd patra-shilpi
 
 uv sync --all-packages          # Python: API + shared packages in one workspace
 cd apps/web && npm install      # Web
@@ -289,7 +289,7 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | `DEVLOG` | | auto | Step-by-step `[API]` `[AGENT]` `[WORKER]` `[LLM]` `[EMBEDDINGS]` lines in the API console. Empty: on in development, off in production |
 | `CORS_ORIGINS` | | `["http://localhost:3000"]` | JSON list of allowed web origins |
 | `MONGODB_URI` | ✅ | | MongoDB connection string |
-| `MONGODB_DB` | | `resume_customizer_dev` | Database name |
+| `MONGODB_DB` | | `patrashilpi_db` | Database name |
 
 </details>
 
@@ -321,7 +321,7 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | `GUEST_HASH_SECRET` | ✅ | | Salts guest hashes and signs the device cookie |
 | `ACCESS_TOKEN_MINUTES` | | `30` | Access token lifetime |
 | `REFRESH_TOKEN_DAYS` | | `14` | Refresh token lifetime (rotated on every use) |
-| `COOKIE_DOMAIN` | | | Empty in dev. In prod, e.g. `.project-subdomain.mydomain.com` |
+| `COOKIE_DOMAIN` | | | Leave empty (host-only cookies on the API). Set a parent domain only if another subdomain must share the cookies |
 | `COOKIE_SECURE` | | `false` | `true` in production (HTTPS) |
 | `COOKIE_SAMESITE` | | `lax` | `lax`, `strict` or `none` |
 | `RATE_LIMIT_PER_HOUR` | | `10` | Customizations and cover letters per user per hour (each) |
@@ -422,17 +422,24 @@ history.
 
 ## Deployment
 
-The planned production setup is two **Render** web services on a custom domain:
+Production runs as two **Render Web Services** (not Static Sites: the Next.js app needs its
+server for server rendering).
 
-| Service | Root | Domain |
+| | Web (Next.js) | API (FastAPI) |
 |---|---|---|
-| Web (Node) | `apps/web` | `https://project-subdomain.mydomain.com` |
-| API (Python, built with uv) | repository root | `https://api.project-subdomain.mydomain.com` |
+| Runtime | Node | Python |
+| Root directory | `apps/web` | repository root (the uv workspace needs `packages/`) |
+| Build command | `npm install && npm run build` | `uv sync --frozen --no-dev --package api && uv cache prune --ci` |
+| Start command | `npm run start` | `uv run --no-sync --package api uvicorn api.main:app --host 0.0.0.0 --port $PORT` |
+| Domain | `https://patrashilpi.suryanshparashar.com` | `https://<api-host>` |
 
-Put both on subdomains of the same domain, so the auth cookies are first-party (set
-`COOKIE_DOMAIN=.project-subdomain.mydomain.com` and `COOKIE_SECURE=true`).
-
-> 🚧 A `render.yaml` blueprint and step-by-step deployment notes are coming in the next phase.
+- **Python version:** set `PYTHON_VERSION=3.12.x` on the API service; the project requires 3.12.
+- **API URL:** set `NEXT_PUBLIC_API_URL=https://<api-host>` on the web service *before* it builds; it is baked into the bundle.
+- **CORS:** `CORS_ORIGINS=["https://patrashilpi.suryanshparashar.com"]`.
+- **Cookies:** leave `COOKIE_DOMAIN` empty and set `COOKIE_SECURE=true`. With the API on a
+  subdomain of the same domain, use `COOKIE_SAMESITE=lax`. If the API stays on
+  `*.onrender.com`, the cookies become third-party: use `COOKIE_SAMESITE=none`, and expect
+  browsers that block third-party cookies (such as Safari) to drop the login.
 
 ## Known limitations and trade-offs
 
@@ -441,7 +448,7 @@ Put both on subdomains of the same domain, so the auth cookies are first-party (
 | Input | **PDF only**, text-based, up to 5 pages | Scanned PDFs are detected and rejected with a clear message (no OCR) |
 | Match score | **Raw cosine similarity × 100**, so most resumes land between 55 and 85 | Honest rather than rescaled. Inputs are truncated to 7,000 characters to fit the embedding model |
 | ATS score | **Estimated by an LLM** from text only | There's no real ATS to test against. The prompt asks for calibrated, specific feedback |
-| Cost and latency | About 15 to 20 Gemini calls per run, half of them supervisor decisions | The trade-off for an agentic supervisor. Free-tier rate limits are absorbed by retries |
+| Cost and latency | **6 Gemini requests** per clean run (5 chat + 1 embedding); a revision adds 3 | The step order is fixed in code and the supervisor LLM only decides revisions. Free-tier rate limits are absorbed by retries |
 | Rate limits | **In-memory**, per process | Fine for a single instance. Multiple instances would need Redis or Mongo-backed limits |
 | Guest limit | Bypassable by a different browser or by clearing data | Fingerprinting is best-effort by design. Logged-in use is the real path |
 | History | Stores the ATS *score* but not the full notes, keyword gaps or fact-check flags | A scope decision. The customized resume, scores and cover letters are kept |
@@ -455,16 +462,14 @@ Put both on subdomains of the same domain, so the auth cookies are first-party (
 
 ## Screenshots
 
-> Image files go in [`docs/screenshots/`](docs/screenshots/); see that folder for the list.
+<img src="docs/screenshots/landing.png" alt="Landing page with the hero, how it works, features and privacy promises" width="900">
+
+**The landing page:** what it does, how it works, and what happens to your data.
 
 | | |
 |:---:|:---:|
-| <img src="docs/screenshots/form.png" alt="Job description and resume form" width="420"> | <img src="docs/screenshots/progress.png" alt="Live agent progress timeline" width="420"> |
-| **Paste a JD, drop your PDF, pick sections** | **Watch the agents work, step by step** |
-| <img src="docs/screenshots/results.png" alt="Scores and side-by-side resumes" width="420"> | <img src="docs/screenshots/admin.png" alt="Admin dashboard" width="420"> |
-| **Scores, original vs. customized, PDF download** | **Admin: users, runs, tokens, cost** |
-
-🎬 **Demo video:** _coming soon_
+| <img src="docs/screenshots/register.png" alt="Create account page" width="420"> | <img src="docs/screenshots/history.png" alt="History page with saved runs, scores and cover letters" width="420"> |
+| **Sign up with a username and password** | **History: every run with its scores, sections and cover letters** |
 
 ## Development
 

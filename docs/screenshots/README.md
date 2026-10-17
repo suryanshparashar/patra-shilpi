@@ -1,14 +1,12 @@
 # Screenshots
 
-The main README shows these files. Until they exist, those images appear broken on GitHub.
+The main README shows these files.
 
-| File | What to capture |
+| File | What it shows |
 |---|---|
-| `hero.png` | The results page: score cards with the original and customized resumes side by side (about 1800 px wide) |
-| `form.png` | The home page with a job description pasted, a PDF attached and sections selected |
-| `progress.png` | The live step timeline mid-run |
-| `results.png` | Scores and the side-by-side resumes, with highlighted skills visible |
-| `admin.png` | The admin dashboard with totals and the users table |
+| `landing.png` | The landing page (hero, how it works, features, privacy promises) |
+| `register.png` | The create-account page |
+| `history.png` | The history page with saved runs, scores and cover letters |
 
 Tips: use a light browser theme at 100% zoom, and blur or replace any real personal details on
-the resume before committing.
+a resume before committing.
