@@ -10,7 +10,7 @@
 Paste a job description, upload your resume, and get a version tailored to that job.
 It is rewritten by a team of AI agents, fact-checked against your original, and scored before and after.
 
-[**Live demo**](https://patrashilpi.suryanshparashar.com) · [Report a bug](https://github.com/suryanshparashar/patra-shilpi/issues)
+[**Live demo**](https://patrashilpi.suryanshparashar.com) · [Demo video](https://patrashilpi.suryanshparashar.com/demo-video) · [Report a bug](https://github.com/suryanshparashar/patra-shilpi/issues)
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-10b981.svg)](LICENSE)
 ![Python 3.12](https://img.shields.io/badge/python-3.12-3776ab?logo=python&logoColor=white)
@@ -342,7 +342,8 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 </details>
 
 **Web** (`apps/web/.env.local`): `NEXT_PUBLIC_API_URL` is the API origin *without* `/api/v1`
-(default `http://localhost:8000`).
+(default `http://localhost:8000`). `NEXT_PUBLIC_DEMO_VIDEO_ID` is the YouTube video ID (or link)
+shown on `/demo-video`; leave it empty to show "coming soon". Both are baked in at build time.
 
 ## API reference
 
@@ -470,6 +471,8 @@ server for server rendering).
 |:---:|:---:|
 | <img src="docs/screenshots/register.png" alt="Create account page" width="420"> | <img src="docs/screenshots/history.png" alt="History page with saved runs, scores and cover letters" width="420"> |
 | **Sign up with a username and password** | **History: every run with its scores, sections and cover letters** |
+
+🎬 **Demo video:** [watch the walkthrough](https://patrashilpi.suryanshparashar.com/demo-video)
 
 ## Development
 

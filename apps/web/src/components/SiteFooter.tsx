@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const REPO_URL = "https://github.com/suryanshparashar/patra-shilpi";
 
 export function SiteFooter() {
@@ -16,6 +18,9 @@ export function SiteFooter() {
           </a>
         </p>
         <nav aria-label="Footer" className="flex gap-5">
+          <Link href="/demo-video" className="hover:text-stone-800">
+            Demo video
+          </Link>
           <a
             href={REPO_URL}
             target="_blank"

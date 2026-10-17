@@ -1,4 +1,7 @@
+import Link from "next/link";
+
 import { BackgroundGraphics } from "@/components/BackgroundGraphics";
+import { PlayIcon } from "@/components/icons";
 import { HeroActions } from "@/components/landing/HeroActions";
 import { ResumePreview } from "@/components/landing/ResumePreview";
 import { Features, FinalCta, HowItWorks, TrustStrip } from "@/components/landing/Sections";
@@ -25,6 +28,13 @@ export default function LandingPage() {
             <p className="mt-4 text-sm text-stone-500">
               One free run as a guest. Your PDF file is never stored.
             </p>
+            <Link
+              href="/demo-video"
+              className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-emerald-700 hover:underline"
+            >
+              <PlayIcon className="size-3.5" />
+              Watch the demo
+            </Link>
           </div>
           <ResumePreview />
         </div>
