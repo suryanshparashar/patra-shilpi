@@ -14,6 +14,7 @@ from agents.result import to_result
 from agents.runtime import AgentRuntime
 from agents.schemas import JDAnalysis, Section, StructuredResume
 from agents.state import GraphState
+from agents.tracing import agent_tracer
 from agents.usage import UsageCollector, UsageRecord
 
 logger = logging.getLogger(__name__)
@@ -67,8 +68,9 @@ class ResumeAgents:
     ) -> AsyncIterator[dict[str, Any]]:
         """Yield `progress`, `token` and `token_reset` events, then one final `result` event."""
         usage = UsageCollector()
+        tracer = agent_tracer(self.runtime.settings)
         config: RunnableConfig = {
-            "callbacks": [usage],
+            "callbacks": [usage, tracer] if tracer is not None else [usage],
             "configurable": {"usage": usage},
             "tags": [state["task"]],
             "metadata": {"task": state["task"]},
