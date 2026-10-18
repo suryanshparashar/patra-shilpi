@@ -7,6 +7,7 @@ from agents.schemas import (
     GuardrailIssue,
     JDAnalysis,
     KeywordGap,
+    RevertedLine,
     StructuredResume,
     WorkerError,
 )
@@ -25,8 +26,13 @@ class RunResult(BaseModel):
     match_after: float | None = None
     ats_report: ATSReport | None = None
     keyword_gap: KeywordGap | None = None
-    guardrail_issues: list[GuardrailIssue] = Field(default_factory=list)
+    guardrail_issues: list[GuardrailIssue] = Field(default_factory=list)  # left for review
+    # The draft before flagged lines were put back, and those reverts, so the user can choose
+    # to keep a rewrite. `customized_resume` already has every revert applied.
+    rewritten_resume: StructuredResume | None = None
+    reverted: list[RevertedLine] = Field(default_factory=list)
     cover_letter: str | None = None
+    letter_issues: list[GuardrailIssue] = Field(default_factory=list)  # still flagged
     errors: list[WorkerError] = Field(default_factory=list)
 
 
@@ -50,6 +56,9 @@ def to_result(state: GraphState) -> RunResult:
         ats_report=state.get("ats_report"),
         keyword_gap=state.get("keyword_gap"),
         guardrail_issues=state.get("guardrail_issues", []),
+        rewritten_resume=state.get("rewritten_resume"),
+        reverted=state.get("reverted", []),
         cover_letter=state.get("cover_letter"),
+        letter_issues=state.get("letter_issues", []),
         errors=errors,
     )

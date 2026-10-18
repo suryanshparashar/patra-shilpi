@@ -22,6 +22,8 @@ class CoverLetterRequest(BaseModel):
     jd_text: str
     customized_resume: StructuredResume
     jd_analysis: JDAnalysis | None = None  # from the run's result; saves re-analyzing the JD
+    # The resume as parsed, before tailoring: the ground truth the letter is fact-checked against.
+    original_resume: StructuredResume | None = None
     run_id: str | None = None  # the history entry to attach the letter to, if the run was saved
 
 
@@ -36,13 +38,21 @@ async def cover_letter(
 
     async def on_result(result: RunResult) -> dict[str, Any]:
         if body.run_id and result.cover_letter:
-            await attach_cover_letter(user, body.run_id, result.cover_letter)
+            index = await attach_cover_letter(
+                user,
+                body.run_id,
+                result.cover_letter,
+                result.letter_issues,
+                fact_checked=not any(e.worker == "letter_check" for e in result.errors),
+            )
+            return {"letter_index": index}  # lets the page save the user's edits to this letter
         return {}
 
     events = agents.stream_cover_letter(
         jd_text=jd,
         customized_resume=body.customized_resume,
         jd_analysis=body.jd_analysis,
+        original_resume=body.original_resume,
         usage_sink=make_usage_sink(user, "cover_letter"),
     )
     return sse_response(run_to_sse(events, on_result=on_result))

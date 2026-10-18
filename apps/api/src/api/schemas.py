@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from agents import Section, StructuredResume
+from agents.schemas import GuardrailIssue
 from db import User
 
 
@@ -26,7 +27,11 @@ class UserOut(BaseModel):
 
 
 class CoverLetterOut(BaseModel):
-    content: str
+    content: str  # what the user last saved: their edit if there is one, else the AI's letter
+    ai_content: str  # the AI's original letter
+    issues: list[GuardrailIssue] = []  # claims the fact-check still flagged in it
+    fact_checked: bool = False  # False: saved before the check existed, or the check failed
+    edited: bool = False
     created_at: datetime
 
 
@@ -43,6 +48,16 @@ class HistoryItem(BaseModel):
     cover_letter_count: int
 
 
+class HistoryEdits(BaseModel):
+    """What the user changed after the run. Fields left out are not touched."""
+
+    resume: StructuredResume | None = None
+    reset_resume: bool = False
+    letter_index: int | None = Field(default=None, ge=0)
+    letter: str | None = Field(default=None, max_length=10_000)
+    reset_letter: bool = False
+
+
 class HistoryPage(BaseModel):
     items: list[HistoryItem]
     next_cursor: str | None
@@ -51,7 +66,9 @@ class HistoryPage(BaseModel):
 class HistoryDetail(HistoryItem):
     jd_text: str
     original_resume: StructuredResume | None
-    customized_resume: StructuredResume | None
+    customized_resume: StructuredResume | None  # the user's edit if there is one
+    ai_resume: StructuredResume | None  # the AI's version, to reset to
+    resume_edited: bool = False
     highlighted_skills: list[str]
     errors: list[str]
     cover_letters: list[CoverLetterOut]

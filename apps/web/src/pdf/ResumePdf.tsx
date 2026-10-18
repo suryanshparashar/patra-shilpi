@@ -1,23 +1,30 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Children } from "react";
 
 import type { StructuredResume } from "@/lib/schemas";
+import { registerPdfFonts } from "@/pdf/fonts";
 
-// Minimal, single-column, ATS-safe: hierarchy comes from weight and size only.
+registerPdfFonts();
+
+// Minimal, single-column, ATS-safe: hierarchy comes from weight and size only. No letter
+// spacing on headings: ATS text extraction reads spaced letters as separate words.
 const styles = StyleSheet.create({
-  page: { padding: 40, fontSize: 10, fontFamily: "Helvetica", lineHeight: 1.4, color: "#111111" },
-  name: { fontSize: 20, fontFamily: "Helvetica-Bold" },
+  page: { padding: 40, fontSize: 10, fontFamily: "Inter", lineHeight: 1.4, color: "#111111" },
+  name: { fontSize: 20, fontWeight: 700 },
   contact: { marginTop: 4, color: "#444444" },
   section: { marginTop: 14 },
   sectionTitle: {
     fontSize: 10,
-    fontFamily: "Helvetica-Bold",
+    fontWeight: 700,
     textTransform: "uppercase",
-    letterSpacing: 1,
     marginBottom: 4,
   },
   item: { marginBottom: 7 },
   row: { flexDirection: "row", justifyContent: "space-between" },
-  bold: { fontFamily: "Helvetica-Bold" },
+  // The title takes the free width and wraps; the date keeps its size, so they never overlap.
+  rowTitle: { flex: 1, paddingRight: 8, fontWeight: 700 },
+  rowDate: { flexShrink: 0, color: "#555555" },
+  bold: { fontWeight: 700 },
   muted: { color: "#555555" },
   bullet: { flexDirection: "row", marginTop: 2 },
   bulletMark: { width: 10 },
@@ -26,6 +33,14 @@ const styles = StyleSheet.create({
 
 function join(parts: (string | null | undefined)[], separator = ", "): string {
   return parts.filter(Boolean).join(separator);
+}
+
+/** "B.Tech in Computer Science", leaving the field out when the institution's name already says
+ * it ("Department of Computer Science"), so it is not printed twice. */
+function degreeLine(edu: StructuredResume["education"][number]): string {
+  const field = edu.field_of_study;
+  const repeated = field && edu.institution.toLowerCase().includes(field.toLowerCase());
+  return join([edu.degree, repeated ? null : field], " in ");
 }
 
 function dateRange(start: string | null, end: string | null): string {
@@ -45,13 +60,17 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
+/** A heading is kept on the same page as the section's first entry (a role, a project, a
+ * paragraph), so it can never sit alone at the bottom of a page. The rest flows normally. */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const [first, ...rest] = Children.toArray(children);
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle} minPresenceAhead={40}>
-        {title}
-      </Text>
-      {children}
+      <View wrap={false}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {first}
+      </View>
+      {rest}
     </View>
   );
 }
@@ -83,8 +102,8 @@ export function ResumePdf({ resume }: { resume: StructuredResume }) {
             {resume.experience.map((job, i) => (
               <View key={i} style={styles.item}>
                 <View style={styles.row} wrap={false}>
-                  <Text style={styles.bold}>{join([job.title, job.company])}</Text>
-                  <Text style={styles.muted}>{dateRange(job.start_date, job.end_date)}</Text>
+                  <Text style={styles.rowTitle}>{join([job.title, job.company])}</Text>
+                  <Text style={styles.rowDate}>{dateRange(job.start_date, job.end_date)}</Text>
                 </View>
                 {job.location ? <Text style={styles.muted}>{job.location}</Text> : null}
                 <Bullets items={job.bullets} />
@@ -113,10 +132,8 @@ export function ResumePdf({ resume }: { resume: StructuredResume }) {
             {resume.education.map((edu, i) => (
               <View key={i} style={styles.item} wrap={false}>
                 <View style={styles.row}>
-                  <Text style={styles.bold}>
-                    {join([join([edu.degree, edu.field_of_study], " in "), edu.institution])}
-                  </Text>
-                  <Text style={styles.muted}>{dateRange(edu.start_date, edu.end_date)}</Text>
+                  <Text style={styles.rowTitle}>{join([degreeLine(edu), edu.institution])}</Text>
+                  <Text style={styles.rowDate}>{dateRange(edu.start_date, edu.end_date)}</Text>
                 </View>
                 <Bullets items={edu.details} />
               </View>

@@ -1,7 +1,11 @@
 import { Document, Page, StyleSheet, Text } from "@react-pdf/renderer";
 
+import { registerPdfFonts } from "@/pdf/fonts";
+
+registerPdfFonts();
+
 const styles = StyleSheet.create({
-  page: { padding: 56, fontSize: 11, fontFamily: "Helvetica", lineHeight: 1.5, color: "#111111" },
+  page: { padding: 56, fontSize: 11, fontFamily: "Inter", lineHeight: 1.5, color: "#111111" },
   paragraph: { marginBottom: 12 },
 });
 

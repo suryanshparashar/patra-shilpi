@@ -4,9 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { ErrorPanel } from "@/components/results/ErrorPanel";
-import { ResultsView } from "@/components/results/ResultsView";
 import { RunProgress } from "@/components/results/RunProgress";
 import { Button } from "@/components/ui";
+import { RunWorkspace } from "@/components/workspace/RunWorkspace";
 import { useRun } from "@/context/run-context";
 
 export default function ResultsPage() {
@@ -49,7 +49,7 @@ export default function ResultsPage() {
       ) : null}
 
       {run.status === "done" && run.result ? (
-        <ResultsView result={run.result} steps={run.steps} />
+        <RunWorkspace result={run.result} steps={run.steps} />
       ) : null}
     </div>
   );

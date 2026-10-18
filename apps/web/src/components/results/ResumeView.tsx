@@ -42,7 +42,9 @@ export function ResumeView({
   );
 
   return (
-    <article className="text-sm leading-relaxed text-stone-800">
+    // wrap-anywhere: one very long token (a URL, or a line whose spaces were lost) wraps inside
+    // the card instead of overflowing it.
+    <article className="min-w-0 text-sm leading-relaxed wrap-anywhere text-stone-800">
       {contact.name ? (
         <h2 className="text-xl font-semibold text-stone-900">{contact.name}</h2>
       ) : null}

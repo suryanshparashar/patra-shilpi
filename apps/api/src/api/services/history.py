@@ -9,8 +9,9 @@ from pydantic import ValidationError
 
 from agents import Section, StructuredResume, devlog
 from agents.result import RunResult
+from agents.schemas import GuardrailIssue
 from api.errors import AppError
-from api.schemas import CoverLetterOut, HistoryDetail, HistoryItem
+from api.schemas import CoverLetterOut, HistoryDetail, HistoryEdits, HistoryItem
 from api.services.pagination import encode_cursor, older_than
 from db import CoverLetter, Run, User
 
@@ -50,14 +51,28 @@ def to_item(run: Run) -> HistoryItem:
 
 
 def to_detail(run: Run) -> HistoryDetail:
+    ai = _parse_resume(run.customized_resume)
+    edited = _parse_resume(run.edited_resume)
     return HistoryDetail(
         **to_item(run).model_dump(),
         jd_text=run.jd_text,
         original_resume=_parse_resume(run.resume_structured),
-        customized_resume=_parse_resume(run.customized_resume),
+        customized_resume=edited or ai,
+        ai_resume=ai,
+        resume_edited=edited is not None,
         highlighted_skills=run.highlighted_skills,
         errors=run.errors,
-        cover_letters=[CoverLetterOut(**c.model_dump()) for c in run.cover_letters],
+        cover_letters=[
+            CoverLetterOut(
+                content=c.edited_content if c.edited_content is not None else c.content,
+                ai_content=c.content,
+                issues=[GuardrailIssue.model_validate(i) for i in c.issues],
+                fact_checked=c.fact_checked,
+                edited=c.edited_content is not None,
+                created_at=c.created_at,
+            )
+            for c in run.cover_letters
+        ],
     )
 
 
@@ -119,12 +134,57 @@ async def save_run(
         return None
 
 
-async def attach_cover_letter(user: User, run_id: str, content: str) -> None:
-    """Add a cover letter to one of the user's runs. Never raises (same reason as save_run)."""
+async def attach_cover_letter(
+    user: User,
+    run_id: str,
+    content: str,
+    issues: list[GuardrailIssue] | None = None,
+    fact_checked: bool = True,
+) -> int | None:
+    """Add a cover letter to one of the user's runs and return its index in the run's letters.
+
+    Never raises (same reason as save_run): returns None if it could not be saved.
+    """
     try:
         run = await get_run(user, run_id)
         await Run.find_one({"_id": run.id}).update(
-            {"$push": {"cover_letters": CoverLetter(content=content).model_dump()}}
+            {
+                "$push": {
+                    "cover_letters": CoverLetter(
+                        content=content,
+                        issues=[i.model_dump() for i in issues or []],
+                        fact_checked=fact_checked,
+                    ).model_dump()
+                }
+            }
         )
+        return len(run.cover_letters)  # the new letter is last
     except Exception:
         logger.exception("Could not save cover letter to history")
+        return None
+
+
+async def save_edits(user: User, run_id: str, edits: HistoryEdits) -> None:
+    """Store the user's edits to a run's resume and/or one of its cover letters.
+
+    The AI's versions are never overwritten, so the user can always reset to them.
+    """
+    run = await get_run(user, run_id)
+    changes: dict[str, object] = {}
+    if edits.reset_resume:
+        changes["edited_resume"] = None
+    elif edits.resume is not None:
+        changes["edited_resume"] = edits.resume.model_dump()
+
+    wants_letter = edits.reset_letter or edits.letter is not None
+    if wants_letter:
+        index = edits.letter_index
+        if index is None or index >= len(run.cover_letters):
+            raise AppError(422, "LETTER_NOT_FOUND", "That cover letter was not found.")
+        changes[f"cover_letters.{index}.edited_content"] = (
+            None if edits.reset_letter else edits.letter
+        )
+
+    if changes:
+        await Run.find_one({"_id": run.id}).update({"$set": changes})
+    devlog("DB", "history edits saved", run=run_id, fields=",".join(sorted(changes)) or None)

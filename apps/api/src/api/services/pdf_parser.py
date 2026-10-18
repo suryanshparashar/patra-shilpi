@@ -11,6 +11,9 @@ from api.config import settings
 from api.errors import AppError
 
 PDF_MAGIC = b"%PDF-"
+# Max horizontal gap (pt) between characters of one word. pdfplumber's default of 3 merges words
+# in tightly set PDFs ("previous-year-questionstargeted..."); 1.5 keeps their spaces.
+X_TOLERANCE = 1.5
 
 
 @dataclass(frozen=True)
@@ -50,7 +53,9 @@ def parse_resume_pdf(data: bytes) -> ParsedResume:
                     f"The PDF has {page_count} pages. The maximum is {settings.max_pdf_pages}.",
                     {"max": settings.max_pdf_pages, "actual": page_count},
                 )
-            text = "\n\n".join((page.extract_text() or "").strip() for page in pdf.pages).strip()
+            text = "\n\n".join(
+                (page.extract_text(x_tolerance=X_TOLERANCE) or "").strip() for page in pdf.pages
+            ).strip()
     except AppError:
         raise
     except PDFPasswordIncorrect as exc:

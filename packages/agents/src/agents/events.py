@@ -10,8 +10,10 @@ WORKER_LABELS = {
     "match_scorer": "Scoring the match",
     "section_customizer": "Customizing resume sections",
     "guardrail": "Fact-checking the customized resume",
+    "resolver": "Restoring unsupported lines",
     "evaluator": "Checking keywords and ATS fit",
     "cover_letter": "Writing the cover letter",
+    "letter_check": "Fact-checking the cover letter",
 }
 
 
@@ -24,13 +26,18 @@ STEP_LABELS = {
     "fact_check": "Fact-checking the changes",
     "revise": "Revising the flagged lines",
     "recheck": "Re-checking the revision",
+    "restore": "Restoring unsupported lines",
     "evaluate": "Checking keywords and ATS fit",
     "match_after": "Scoring the match",
     "cover_letter": "Writing the cover letter",
+    "letter_check": "Fact-checking the cover letter",
+    "letter_revise": "Rewriting the flagged claims",
+    "letter_recheck": "Re-checking the cover letter",
 }
 
 # The steps a run is expected to take, announced up front so the UI can list them all.
-# "revise" and "recheck" are not planned: they only appear if the fact-check flags something.
+# "revise", "recheck", "restore", "letter_revise" and "letter_recheck" are not planned: they
+# only appear if a fact-check flags something.
 PLANS = {
     "customize": [
         "jd",
@@ -40,7 +47,7 @@ PLANS = {
         "evaluate",
         "match_after",
     ],
-    "cover_letter": ["jd", "cover_letter"],
+    "cover_letter": ["jd", "cover_letter", "letter_check"],
 }
 
 

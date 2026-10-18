@@ -52,6 +52,7 @@ class ResumeAgents:
         jd_text: str,
         customized_resume: StructuredResume,
         jd_analysis: JDAnalysis | None = None,
+        original_resume: StructuredResume | None = None,
         usage_sink: UsageSink | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         state: GraphState = {
@@ -61,6 +62,8 @@ class ResumeAgents:
         }
         if jd_analysis is not None:
             state["jd_analysis"] = jd_analysis  # the run already analyzed it: skip that call
+        if original_resume is not None:
+            state["structured_resume"] = original_resume  # ground truth for the letter's check
         return self._stream(state, usage_sink)
 
     async def _stream(

@@ -17,8 +17,10 @@ import { ApiError } from "@/lib/http";
 import {
   SECTIONS,
   type CustomizeInput,
+  type GuardrailIssue,
   type RunResult,
   type Section,
+  type StructuredResume,
   type StreamEvent,
 } from "@/lib/schemas";
 import { clearRun, loadRun, saveRun } from "@/lib/session";
@@ -50,6 +52,20 @@ export interface CoverLetterState {
   status: "idle" | "running" | "done" | "error";
   text: string;
   error: ErrorInfo | null;
+  /** What is happening right now while running, e.g. "Fact-checking the cover letter". */
+  phase?: string | null;
+  /** Claims the fact-check still flags after the automatic rewrite. */
+  issues?: GuardrailIssue[];
+  /** The letter's position in the saved run's letters (logged-in users), for saving edits. */
+  index?: number | null;
+  /** False when the fact-check step itself failed, so the letter was never checked. */
+  checked?: boolean;
+}
+
+/** What the user changed after the run. `null` means "not edited": the AI's version is used. */
+export interface Edits {
+  resume: StructuredResume | null;
+  letter: string | null;
 }
 
 interface RunContextValue {
@@ -64,11 +80,19 @@ interface RunContextValue {
   resetRun: () => void;
   coverLetter: CoverLetterState;
   generateCoverLetter: () => Promise<void>;
+  edits: Edits;
+  /** Keep the user's edited resume (survives a refresh; saved to history when logged in). */
+  editResume: (resume: StructuredResume) => void;
+  /** Go back to the AI's resume. */
+  resetResume: () => void;
+  editLetter: (text: string) => void;
+  resetLetter: () => void;
 }
 
 const INITIAL_DRAFT: Draft = { jdText: "", sections: [...SECTIONS], file: null };
 const IDLE_RUN: RunState = { status: "idle", steps: [], result: null, error: null, jdText: "" };
 const IDLE_COVER_LETTER: CoverLetterState = { status: "idle", text: "", error: null };
+const NO_EDITS: Edits = { resume: null, letter: null };
 
 const RunContext = createContext<RunContextValue | null>(null);
 
@@ -85,6 +109,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<Draft>(INITIAL_DRAFT);
   const [run, setRun] = useState<RunState>(IDLE_RUN);
   const [coverLetter, setCoverLetter] = useState<CoverLetterState>(IDLE_COVER_LETTER);
+  const [edits, setEdits] = useState<Edits>(NO_EDITS);
   const runAbort = useRef<AbortController | null>(null);
   const coverAbort = useRef<AbortController | null>(null);
 
@@ -99,11 +124,45 @@ export function RunProvider({ children }: { children: ReactNode }) {
         jdText: saved.jdText,
       });
       if (saved.coverLetter) {
-        setCoverLetter({ status: "done", text: saved.coverLetter, error: null });
+        setCoverLetter({
+          status: "done",
+          text: saved.coverLetter,
+          error: null,
+          issues: saved.letterIssues ?? [],
+          index: saved.letterIndex ?? null,
+          checked: saved.letterChecked ?? true,
+        });
       }
+      setEdits({ resume: saved.editedResume ?? null, letter: saved.editedLetter ?? null });
     }
     setHydrated(true);
   }, []);
+
+  // Keep the finished run, the letter and the user's edits for this tab, so a refresh restores
+  // them. Not while a letter is streaming (that would save on every token).
+  useEffect(() => {
+    if (!hydrated || run.status !== "done" || !run.result) return;
+    if (coverLetter.status === "running") return;
+    saveRun({
+      jdText: run.jdText,
+      result: run.result,
+      coverLetter: coverLetter.status === "done" ? coverLetter.text : null,
+      letterIssues: coverLetter.issues ?? [],
+      letterIndex: coverLetter.index ?? null,
+      letterChecked: coverLetter.checked ?? true,
+      editedResume: edits.resume,
+      editedLetter: edits.letter,
+    });
+  }, [hydrated, run.status, run.result, run.jdText, coverLetter, edits]);
+
+  const editResume = useCallback((resume: StructuredResume) => {
+    setEdits((prev) => ({ ...prev, resume }));
+  }, []);
+  const resetResume = useCallback(() => setEdits((prev) => ({ ...prev, resume: null })), []);
+  const editLetter = useCallback((letter: string) => {
+    setEdits((prev) => ({ ...prev, letter }));
+  }, []);
+  const resetLetter = useCallback(() => setEdits((prev) => ({ ...prev, letter: null })), []);
 
   const updateDraft = useCallback((patch: Partial<Draft>) => {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -115,6 +174,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
     clearRun();
     setRun(IDLE_RUN);
     setCoverLetter(IDLE_COVER_LETTER);
+    setEdits(NO_EDITS);
   }, []);
 
   /** Consume a customize-style event stream into the run state. */
@@ -126,6 +186,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
       runAbort.current = controller;
       clearRun();
       setCoverLetter(IDLE_COVER_LETTER);
+      setEdits(NO_EDITS);
       setRun({ ...IDLE_RUN, status: "running", jdText });
 
       try {
@@ -169,7 +230,6 @@ export function RunProvider({ children }: { children: ReactNode }) {
           return;
         }
         setRun((prev) => ({ ...prev, status: "done", result, steps: finalizeSteps(prev.steps) }));
-        saveRun({ jdText, result, coverLetter: null });
       } catch (error) {
         if (controller.signal.aborted) return;
         const info = toErrorInfo(error);
@@ -208,17 +268,25 @@ export function RunProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     coverAbort.current = controller;
     setCoverLetter({ status: "running", text: "", error: null });
+    setEdits((prev) => ({ ...prev, letter: null })); // a new letter replaces any edited one
 
     try {
       let letter = "";
+      let issues: GuardrailIssue[] = [];
+      let index: number | null = null;
+      let checked = true;
       const request = {
         jdText: run.jdText,
         resume,
+        originalResume: run.result.original_resume,
         jdAnalysis: run.result.jd_analysis ?? null,
         runId: run.result.run_id,
       };
       for await (const event of streamCoverLetter(request, controller.signal)) {
-        if (event.kind === "token") {
+        if (event.kind === "progress" && event.data.status === "started" && event.data.step) {
+          const phase = event.data.label;
+          setCoverLetter((prev) => ({ ...prev, phase }));
+        } else if (event.kind === "token") {
           setCoverLetter((prev) => ({ ...prev, text: prev.text + event.text }));
         } else if (event.kind === "token_reset") {
           setCoverLetter((prev) => ({ ...prev, text: "" }));
@@ -229,6 +297,9 @@ export function RunProvider({ children }: { children: ReactNode }) {
             throw new ApiError("COVER_LETTER_FAILED", message, 0, first?.code ?? null);
           }
           letter = event.data.cover_letter;
+          issues = event.data.letter_issues ?? [];
+          index = event.data.letter_index ?? null;
+          checked = !event.data.errors.some((e) => e.worker === "letter_check");
         } else if (event.kind === "error") {
           throw new ApiError(event.code, event.message);
         }
@@ -236,8 +307,7 @@ export function RunProvider({ children }: { children: ReactNode }) {
       if (!letter) {
         throw new ApiError("STREAM_ENDED", "The connection ended before the letter arrived.");
       }
-      setCoverLetter({ status: "done", text: letter, error: null });
-      saveRun({ jdText: run.jdText, result: run.result, coverLetter: letter });
+      setCoverLetter({ status: "done", text: letter, error: null, issues, index, checked });
     } catch (error) {
       if (controller.signal.aborted) return;
       setCoverLetter((prev) => ({ ...prev, status: "error", error: toErrorInfo(error) }));
@@ -255,6 +325,11 @@ export function RunProvider({ children }: { children: ReactNode }) {
       resetRun,
       coverLetter,
       generateCoverLetter,
+      edits,
+      editResume,
+      resetResume,
+      editLetter,
+      resetLetter,
     }),
     [
       hydrated,
@@ -266,6 +341,11 @@ export function RunProvider({ children }: { children: ReactNode }) {
       resetRun,
       coverLetter,
       generateCoverLetter,
+      edits,
+      editResume,
+      resetResume,
+      editLetter,
+      resetLetter,
     ],
   );
 

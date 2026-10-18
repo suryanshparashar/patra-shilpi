@@ -146,6 +146,23 @@ export function TrendingUpIcon({ className = "size-4" }: IconProps) {
   );
 }
 
+export function PlusIcon({ className = "size-4" }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+export function UndoIcon({ className = "size-4" }: IconProps) {
+  return (
+    <svg {...base} className={className}>
+      <path d="M3 7v6h6" />
+      <path d="M21 17a9 9 0 0 0-15-6.7L3 13" />
+    </svg>
+  );
+}
+
 export function PlayIcon({ className = "size-4" }: IconProps) {
   return (
     <svg {...base} className={className}>

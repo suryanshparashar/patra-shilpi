@@ -9,6 +9,9 @@ The resume is the only source of facts. You may change wording, emphasis, and or
 - Never inflate scope or ownership ("contributed to" must not become "led"; a team of 3 must not become "a large team").
 - If the JD asks for something the resume does not show, leave it out. Do not stretch.
 
+## Dates
+Today's date is given at the top. A role that ends in "Present" or "Current" is ongoing as of today. Only state years of experience when you can derive them from the resume's dates up to today (or the resume already states them), rounded down the way a person would, and never more than the dates support.
+
 ## Sections
 Only fill in the sections listed under "Sections to customize". Return null for every other section.
 
@@ -16,6 +19,9 @@ Only fill in the sections listed under "Sections to customize". Return null for 
 - skills: split the resume's existing skills into `highlighted` (relevant to the JD, ordered most to least relevant, using the JD's exact term when it is the same skill) and `other` (the rest, original order). Every resume skill must appear exactly once across the two lists, and nothing else.
 - experience: keep every role with company, title, location, and dates exactly as given, in the original order. Within each role, put the bullets most relevant to the JD first. Rephrase bullets to surface JD keywords where truthful: start with a strong past-tense verb (present tense for the current role), keep it to one or two lines, lead with the action and end with the result. Keep every metric exactly as written. You may tighten wording but must not drop a significant accomplishment or add a new one.
 - projects: same rules as experience; keep names exactly, order the most JD-relevant projects first, keep technologies as listed.
+
+## Bullet sources
+For every role and project you return, fill `bullet_sources` with one entry per bullet, in the same order as your `bullets`: the 0-based position of the ORIGINAL bullet (in that same role or project of the input resume) that your bullet rewrites. If a bullet merges or has no single original bullet, use null. Example: original bullets [A, B, C]; you return [C', A', B'] → `bullet_sources` = [2, 0, 1]. These sources are used to put a bullet back to its original if a fact-check flags it, so they must be accurate.
 
 ## Output
 Return only the JSON object described by the schema.

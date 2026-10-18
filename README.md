@@ -20,7 +20,7 @@ It is rewritten by a team of AI agents, fact-checked against your original, and 
 ![Gemini](https://img.shields.io/badge/LLM-Google%20Gemini-4285f4?logo=googlegemini&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47a248?logo=mongodb&logoColor=white)
 
-<img src="docs/screenshots/landing.png" alt="PatraShilpi landing page: Shaped to the job. Never a fact invented." width="900">
+<img src="docs/screenshots/landing-viewport.png" alt="PatraShilpi landing page: Shaped to the job. Never a fact invented." width="900">
 
 </div>
 
@@ -67,7 +67,8 @@ facts**. Every rewrite is checked against your original resume before you see it
 - 📄 **Resume upload:** a PDF up to 5 MB, by drag and drop or browsing. The file name and size are shown, and the text is extracted on the server.
 - 🤖 **AI customization:** the summary is rewritten for the role, relevant skills are highlighted and reordered, and experience and project bullets are rephrased using the job's keywords.
 - 🔍 **Missing keywords:** terms from the job description that your resume doesn't show, with honest advice on whether and where to add each one.
-- ⬇️ **PDF download:** a clean, single-column, ATS-friendly PDF, generated in the browser.
+- ✏️ **Edit before you download:** the results page is a workspace. Click any line of the resume to change it, add or remove bullets and skills, and edit the cover letter as plain text. Flagged phrases are highlighted in place and stop being flagged once you edit them out. The PDFs are built from exactly what you see.
+- ⬇️ **PDF download:** a clean, single-column, ATS-friendly PDF with an embedded font, generated in the browser.
 - 🛡️ **Clear errors:** wrong file type, oversized or scanned PDFs, and empty or invalid input each get a specific message. AI failures are retried and degrade gracefully.
 
 **Beyond the brief**
@@ -77,10 +78,10 @@ facts**. Every rewrite is checked against your original resume before you see it
 | 🎯 | **Match score** | Semantic similarity between resume and job, **before and after** customization (Gemini embeddings). |
 | ✅ | **ATS score** | A 0 to 100 estimate of ATS-friendliness, with strengths and specific fixes. |
 | 🧩 | **Section-wise customization** | Choose which of Summary, Skills, Experience and Projects to change. Everything else stays exactly as you wrote it. |
-| ✉️ | **Cover letter** | Generated on demand from the job and your tailored resume. Streams in, then downloads as a PDF. |
+| ✉️ | **Cover letter** | Generated on demand from the job and your tailored resume, then fact-checked against your original and rewritten once if anything is unsupported. Streams in, then downloads as a PDF. |
 | ⚡ | **Streaming** | A live step-by-step timeline while the agents work, over Server-Sent Events. |
 | 🔐 | **Accounts and history** | Username and password login. Every run is saved, with view, re-download, **re-run with different sections**, and delete. |
-| 🧪 | **Fact-check guardrail** | A dedicated agent flags anything the original resume doesn't support, and triggers one automatic revision. |
+| 🧪 | **Fact-check guardrail** | A dedicated agent flags anything the original resume doesn't support and triggers one automatic revision. Anything still flagged goes back to your original wording by default. |
 | 📊 | **Admin panel** | Users, guests, runs, LLM calls, tokens and estimated cost. |
 
 ## How it works
@@ -89,7 +90,8 @@ Customization is a **LangGraph supervisor-and-workers graph**. The order of the 
 **fixed in code** (so no model call is spent deciding it), and each runs once per turn. The LLM
 supervisor is consulted for the one real judgement: when the fact-check flags the draft, should it
 be sent back for a revision? A clean run therefore costs **6 model requests** (5 chat plus 1
-embedding); a revision adds 3, and a cover letter after a run adds 1.
+embedding); a revision adds 3. Restoring flagged lines costs nothing (it is plain code). A cover
+letter after a run costs 2 (write and fact-check), or 4 if it needs its one rewrite.
 
 ```mermaid
 flowchart LR
@@ -99,21 +101,26 @@ flowchart LR
     S --> RS["Resume Structurer<br/><sub>PDF text to structured data</sub>"]
     S --> SC["Section Customizer<br/><sub>rewrites the selected sections</sub>"]
     S --> GR["Fact-Check Guardrail<br/><sub>flags invented claims</sub>"]
+    S --> RV["Resolver<br/><sub>code: restores flagged lines</sub>"]
     S --> EV["Evaluator<br/><sub>missing keywords and ATS 0 to 100</sub>"]
     S --> MS["Match Scorer<br/><sub>one embedding call, before and after</sub>"]
     S --> CL["Cover Letter<br/><sub>on demand</sub>"]
+    S --> LC["Letter Check<br/><sub>fact-checks the letter</sub>"]
 
-    JD & RS & SC & GR & EV & MS & CL -.->|report back| S
+    JD & RS & SC & GR & RV & EV & MS & CL & LC -.->|report back| S
     GR ==>|issues found, 1 revision| SC
+    LC ==>|issues found, 1 rewrite| CL
 ```
 
 **What makes the output trustworthy**
 
 1. **Grounded rewriting.** The customizer may change wording, emphasis and order, never facts. Employers, titles, dates, degrees and metrics stay as written. It can use the job's terminology only for skills you already show (`JS` becoming `JavaScript` is allowed; claiming a new tool is not).
 2. **An independent fact-check.** A separate guardrail agent compares the draft with your original. It flags new skills, changed numbers, and inflated scope ("contributed" turning into "led").
-3. **One self-correction loop.** If the guardrail finds real problems, the supervisor sends the flagged items back to the customizer for one revision. Anything still unresolved is shown to you to review.
-4. **Structured outputs everywhere.** Every agent returns schema-validated JSON (Pydantic), so the UI never parses free text. A code-level safety net also keeps the original section if a rewrite ever drops or adds a whole role.
-5. **Resilience.** Gemini calls retry on rate limits, server errors and timeouts (3 attempts, exponential backoff with jitter). A step that still fails is recorded, and the rest of the run carries on, so you get **partial results** instead of a blank error page.
+3. **One self-correction loop.** If the guardrail finds real problems, the supervisor sends the flagged items back to the customizer for one revision.
+4. **Unsupported lines never reach your PDF by default.** Anything still flagged after that is put back to your original wording (or removed, if it has no source), before the scores are computed. The customizer reports which original bullet each rewrite came from, so only the flagged line changes. You can still choose *Keep rewrite* for any of them.
+5. **The cover letter is checked too.** A second guardrail compares the letter with your original resume and flags invented tools, practices and inflated depth ("deep hands-on experience"). The letter is rewritten once without them; anything left is shown under it.
+6. **Structured outputs everywhere.** Every agent returns schema-validated JSON (Pydantic), so the UI never parses free text. A code-level safety net also keeps the original section if a rewrite ever drops or adds a whole role.
+7. **Resilience.** Gemini calls retry on rate limits, server errors and timeouts (3 attempts, exponential backoff with jitter). A step that still fails is recorded, and the rest of the run carries on, so you get **partial results** instead of a blank error page.
 
 All the system prompts are versioned plain-text files in
 [`packages/agents/src/agents/prompts/`](packages/agents/src/agents/prompts/).
@@ -211,7 +218,8 @@ packages can never drift to different dependency versions.
 The chat model is deliberately configured only through the environment, so you can switch to
 any Gemini model your key has access to without touching code. A clean run makes **6 Gemini
 requests** (JD analysis, resume structuring, customizing, fact-check, keywords and ATS in one
-call, and one embedding call for both match scores). A revision adds 3, and a cover letter adds 1.
+call, and one embedding call for both match scores). A revision adds 3; a cover letter costs 2
+(write and fact-check), or 4 with its one rewrite.
 
 ## Getting started
 
@@ -363,6 +371,7 @@ Every backend route lives under **`/api/v1`**. Errors always have the same shape
 | `GET` | `/auth/me` | user | Current user |
 | `GET` | `/history` | user | Saved runs, newest first (`?cursor=`) |
 | `GET` | `/history/{id}` | user | One saved run |
+| `PATCH` | `/history/{id}` | user | Save your edits to the resume and/or a cover letter (`resume`, `letter_index` + `letter`, or `reset_resume` / `reset_letter`). The AI versions are kept |
 | `DELETE` | `/history/{id}` | user | Delete a run |
 | `POST` | `/history/{id}/rerun` | user | Re-run with other `sections[]`. **SSE stream** |
 | `POST` | `/admin/login` · `/admin/login/keyword` | | Admin login (password or keyword) |
@@ -449,11 +458,13 @@ server for server rendering).
 |---|---|---|
 | Input | **PDF only**, text-based, up to 5 pages | Scanned PDFs are detected and rejected with a clear message (no OCR) |
 | Match score | **Raw cosine similarity × 100**, so most resumes land between 55 and 85 | Honest rather than rescaled. Inputs are truncated to 7,000 characters to fit the embedding model |
-| ATS score | **Estimated by an LLM** from text only | There's no real ATS to test against. The prompt asks for calibrated, specific feedback |
+| ATS score | **Estimated by an LLM** from text only | There's no real ATS to test against. The model scores six fixed criteria (0 to 20 each, anchored descriptions, including *role fit*, so a good-looking resume for the wrong kind of role scores low) at temperature 0, and the code adds them up and rescales to 100. That narrows run-to-run swings, but Gemini is not fully deterministic, and two different tailored drafts can legitimately score differently |
 | Cost and latency | **6 Gemini requests** per clean run (5 chat + 1 embedding); a revision adds 3 | The step order is fixed in code and the supervisor LLM only decides revisions. Free-tier rate limits are absorbed by retries |
 | Rate limits | **In-memory**, per process | Fine for a single instance. Multiple instances would need Redis or Mongo-backed limits |
 | Guest limit | Bypassable by a different browser or by clearing data | Fingerprinting is best-effort by design. Logged-in use is the real path |
-| History | Stores the ATS *score* but not the full notes, keyword gaps or fact-check flags | A scope decision. The customized resume, scores and cover letters are kept |
+| History | Stores the ATS *score* but not the full notes, keyword gaps or fact-check flags, and a saved letter's flags are not kept | A scope decision. The customized resume, your edits, scores and cover letters are kept, and the AI's versions are kept next to your edits so you can reset |
+| Cover letter check | The letter is fact-checked by an LLM, so a loosely worded claim can slip through | Flags are highlighted and stored with the letter; you can edit any phrase out. Your own edits are never fact-checked, and the page says so |
+| Editing | Edits are kept in the tab (and saved to history for logged-in users); guests lose them when the tab closes | Guests have no account to save to |
 | Accounts | No password reset (no email) | Usernames, not emails, by design. The register page says so |
 | Streaming UI | Shows a step timeline, not live tokens | The customizer streams JSON, so a timeline reads better |
 | Single model | Every agent uses one `GEMINI_MODEL` | Simpler to run. Cost estimates assume that one model's price |
@@ -464,7 +475,7 @@ server for server rendering).
 
 ## Screenshots
 
-<img src="docs/screenshots/landing.png" alt="Landing page with the hero, how it works, features and privacy promises" width="900">
+<img src="docs/screenshots/landing-viewport.png" alt="Landing page with the hero, how it works, features and privacy promises" width="900">
 
 **The landing page:** what it does, how it works, and what happens to your data.
 

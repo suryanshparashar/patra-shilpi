@@ -1,4 +1,5 @@
 import json
+from datetime import date
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -7,6 +8,20 @@ from pydantic import BaseModel
 from agents.events import emit_token, emit_token_reset
 from agents.retry import LLMOutputError, with_retry
 from agents.runtime import AgentRuntime
+
+
+def with_today(system: str) -> str:
+    """The system prompt with today's date prepended.
+
+    A model does not know the date, and assumes one near its training cutoff. Anything that
+    reasons about time ("Jan 2022 - Present" is how many years? is this role current?) is wrong
+    without it, and the fact-checks then flag true claims. Added to every call, in one place.
+    """
+    return (
+        f"Today's date: {date.today().isoformat()}. Use it whenever you reason about time: "
+        'a role that ends in "Present" or "Current" is ongoing as of this date, and durations '
+        "and years of experience are counted up to it.\n\n" + system
+    )
 
 
 def agent_config(config: RunnableConfig, agent: str) -> RunnableConfig:
@@ -30,7 +45,7 @@ async def invoke_structured[M: BaseModel](
 ) -> M:
     """One structured-output Gemini call, validated against `schema`, with retries."""
     llm = rt.chat(temperature).with_structured_output(schema)
-    messages = [SystemMessage(system), HumanMessage(human)]
+    messages = [SystemMessage(with_today(system)), HumanMessage(human)]
 
     async def attempt() -> M:
         result = await llm.ainvoke(messages, config=agent_config(config, agent))
@@ -60,7 +75,8 @@ async def stream_json[M: BaseModel](
     schema_hint = json.dumps(schema.model_json_schema())
     messages = [
         SystemMessage(
-            f"{system}\n\nReturn one JSON object matching this JSON Schema:\n{schema_hint}"
+            f"{with_today(system)}\n\n"
+            f"Return one JSON object matching this JSON Schema:\n{schema_hint}"
         ),
         HumanMessage(human),
     ]
@@ -93,7 +109,7 @@ async def stream_text(
 ) -> str:
     """Stream plain prose token by token and return the full text."""
     llm = rt.chat(temperature)
-    messages = [SystemMessage(system), HumanMessage(human)]
+    messages = [SystemMessage(with_today(system)), HumanMessage(human)]
 
     async def attempt() -> str:
         parts: list[str] = []

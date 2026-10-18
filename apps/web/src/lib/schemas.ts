@@ -118,6 +118,26 @@ export type JDAnalysis = z.infer<typeof jdAnalysisSchema>;
 
 // --- Run result -------------------------------------------------------------------------
 
+const guardrailIssueSchema = z.object({
+  section: z.string(),
+  claim: z.string(),
+  reason: z.string(),
+});
+export type GuardrailIssue = z.infer<typeof guardrailIssueSchema>;
+
+/** A flagged line put back to the original by default. Locations refer to `rewritten_resume`. */
+export const revertedLineSchema = z.object({
+  section: z.enum(["summary", "skills", "experience", "projects"]),
+  item: z.number().nullish(),
+  bullet: z.number().nullish(),
+  skill: z.string().nullish(),
+  /** What it goes back to; null means the line is removed. */
+  original: z.string().nullable(),
+  rewrite: z.string(),
+  reason: z.string(),
+});
+export type RevertedLine = z.infer<typeof revertedLineSchema>;
+
 export const runResultSchema = z.object({
   status: z.enum(["completed", "partial", "failed"]),
   jd_analysis: jdAnalysisSchema.nullish(),
@@ -127,7 +147,15 @@ export const runResultSchema = z.object({
   match_before: z.number().nullable(),
   match_after: z.number().nullable(),
   ats_report: z
-    .object({ score: z.number(), strengths: z.array(z.string()), issues: z.array(z.string()) })
+    .object({
+      score: z.number(),
+      strengths: z.array(z.string()),
+      issues: z.array(z.string()),
+      /** The fixed rubric the score is the sum of (empty for runs saved before it existed). */
+      breakdown: z
+        .array(z.object({ name: z.string(), score: z.number(), max: z.number() }))
+        .optional(),
+    })
     .nullable(),
   keyword_gap: z
     .object({
@@ -140,10 +168,16 @@ export const runResultSchema = z.object({
       ),
     })
     .nullable(),
-  guardrail_issues: z.array(
-    z.object({ section: z.string(), claim: z.string(), reason: z.string() }),
-  ),
+  /** Flags that could not be located and reverted: left for the user to review. */
+  guardrail_issues: z.array(guardrailIssueSchema),
+  /** The draft before flagged lines were restored, and those restores. */
+  rewritten_resume: structuredResumeSchema.nullish(),
+  reverted: z.array(revertedLineSchema).optional(),
   cover_letter: z.string().nullable(),
+  /** Claims in the cover letter the fact-check still flags after its rewrite. */
+  letter_issues: z.array(guardrailIssueSchema).optional(),
+  /** Position of the letter in the saved run's letters, for saving the user's edits to it. */
+  letter_index: z.number().nullish(),
   errors: z.array(
     z.object({ worker: z.string(), message: z.string(), code: z.string().nullish() }),
   ),
@@ -230,10 +264,26 @@ export const historyPageSchema = z.object({
 export const historyDetailSchema = historyItemSchema.extend({
   jd_text: z.string(),
   original_resume: structuredResumeSchema.nullable(),
+  /** The user's edit if there is one, else the AI's resume. */
   customized_resume: structuredResumeSchema.nullable(),
+  /** The AI's resume, to reset to. */
+  ai_resume: structuredResumeSchema.nullable(),
+  resume_edited: z.boolean(),
   highlighted_skills: z.array(z.string()),
   errors: z.array(z.string()),
-  cover_letters: z.array(z.object({ content: z.string(), created_at: z.string() })),
+  cover_letters: z.array(
+    z.object({
+      /** The user's edit if there is one, else the AI's letter. */
+      content: z.string(),
+      ai_content: z.string(),
+      edited: z.boolean(),
+      /** Claims the fact-check still flagged in the AI's letter. */
+      issues: z.array(guardrailIssueSchema),
+      /** False for letters saved before the check existed, or when the check failed. */
+      fact_checked: z.boolean(),
+      created_at: z.string(),
+    }),
+  ),
 });
 export type HistoryDetail = z.infer<typeof historyDetailSchema>;
 

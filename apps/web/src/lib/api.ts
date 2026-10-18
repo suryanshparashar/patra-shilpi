@@ -85,6 +85,8 @@ export function streamCoverLetter(
   req: {
     jdText: string;
     resume: StructuredResume;
+    /** The resume as parsed, before tailoring: what the letter is fact-checked against. */
+    originalResume: StructuredResume | null;
     jdAnalysis: JDAnalysis | null;
     runId: string | null;
   },
@@ -94,6 +96,7 @@ export function streamCoverLetter(
     body: JSON.stringify({
       jd_text: req.jdText,
       customized_resume: req.resume,
+      original_resume: req.originalResume,
       jd_analysis: req.jdAnalysis,
       run_id: req.runId,
     }),

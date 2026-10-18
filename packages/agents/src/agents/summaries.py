@@ -95,6 +95,30 @@ def _recheck(update: dict[str, Any], state: GraphState) -> str:
     return f"Re-checked · {_invented(len(update['guardrail_issues']), still=True)}"
 
 
+def _restore(update: dict[str, Any], state: GraphState) -> str:
+    restored = len(update["reverted"])
+    left = len(update["guardrail_issues"])
+    line = (
+        f"Restored {_plural(restored, 'line')} to your original"
+        if restored
+        else "Nothing to restore"
+    )
+    return f"{line} · {left} left to review" if left else line
+
+
+def _letter_check(update: dict[str, Any], state: GraphState) -> str:
+    return f"Checked the letter · {_invented(len(update['letter_issues']))}"
+
+
+def _letter_revise(update: dict[str, Any], state: GraphState) -> str:
+    flagged = len(state.get("letter_issues", []))
+    return f"Rewrote the letter without {_plural(flagged, 'flagged claim')}"
+
+
+def _letter_recheck(update: dict[str, Any], state: GraphState) -> str:
+    return f"Re-checked · {_invented(len(update['letter_issues']), still=True)}"
+
+
 def _evaluate(update: dict[str, Any], state: GraphState) -> str:
     report: ATSReport = update["ats_report"]
     gap: KeywordGap = update["keyword_gap"]
@@ -127,9 +151,13 @@ _SUMMARIES: dict[str, Callable[[dict[str, Any], GraphState], str]] = {
     "fact_check": _fact_check,
     "revise": _revise,
     "recheck": _recheck,
+    "restore": _restore,
     "evaluate": _evaluate,
     "match_after": _match_after,
     "cover_letter": _cover_letter,
+    "letter_check": _letter_check,
+    "letter_revise": _letter_revise,
+    "letter_recheck": _letter_recheck,
 }
 
 

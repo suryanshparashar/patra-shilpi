@@ -5,8 +5,15 @@ from fastapi import APIRouter, Form, Query, Response
 from agents import Section
 from api.config import settings
 from api.deps import AgentsDep, RequiredUserDep, customize_limiter
-from api.schemas import HistoryDetail, HistoryPage
-from api.services.history import get_run, list_runs, save_run, to_detail, to_item
+from api.schemas import HistoryDetail, HistoryEdits, HistoryPage
+from api.services.history import (
+    get_run,
+    list_runs,
+    save_edits,
+    save_run,
+    to_detail,
+    to_item,
+)
 from api.services.streaming import run_to_sse
 from api.services.usage import make_usage_sink
 from api.sse import sse_response
@@ -30,6 +37,13 @@ async def list_history(
 @router.get("/{run_id}")
 async def get_history_item(run_id: str, user: RequiredUserDep) -> HistoryDetail:
     return to_detail(await get_run(user, run_id))
+
+
+@router.patch("/{run_id}", status_code=204)
+async def edit_history_item(run_id: str, edits: HistoryEdits, user: RequiredUserDep) -> Response:
+    """Save the user's edits to the resume and/or a cover letter. The AI versions are kept."""
+    await save_edits(user, run_id, edits)
+    return Response(status_code=204)
 
 
 @router.delete("/{run_id}", status_code=204)
