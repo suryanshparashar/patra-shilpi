@@ -67,7 +67,7 @@ facts**. Every rewrite is checked against your original resume before you see it
 - 📄 **Resume upload:** a PDF up to 5 MB, by drag and drop or browsing. The file name and size are shown, and the text is extracted on the server.
 - 🤖 **AI customization:** the summary is rewritten for the role, relevant skills are highlighted and reordered, and experience and project bullets are rephrased using the job's keywords.
 - 🔍 **Missing keywords:** terms from the job description that your resume doesn't show, with honest advice on whether and where to add each one.
-- ✏️ **Edit before you download:** the results page is a workspace. Click any line of the resume to change it, add or remove bullets and skills, and edit the cover letter as plain text. Flagged phrases are highlighted in place and stop being flagged once you edit them out. The PDFs are built from exactly what you see.
+- ✏️ **Edit before you download:** the results page is a workspace with tabs for the resume, the cover letter and a comparison with your original. Click any line of the resume to change it, add or remove bullets and skills, and edit the cover letter as plain text. Flagged phrases are highlighted in place, listed in a **Fact-check** card (one for the resume, one for the letter), and stop being flagged once you edit them out. Your own edits are never presented as fact-checked. The PDFs are built from exactly what you see, and edits are saved to your history.
 - ⬇️ **PDF download:** a clean, single-column, ATS-friendly PDF with an embedded font, generated in the browser.
 - 🛡️ **Clear errors:** wrong file type, oversized or scanned PDFs, and empty or invalid input each get a specific message. AI failures are retried and degrade gracefully.
 
@@ -76,11 +76,11 @@ facts**. Every rewrite is checked against your original resume before you see it
 | | Feature | What it does |
 |---|---|---|
 | 🎯 | **Match score** | Semantic similarity between resume and job, **before and after** customization (Gemini embeddings). |
-| ✅ | **ATS score** | A 0 to 100 estimate of ATS-friendliness, with strengths and specific fixes. |
+| ✅ | **ATS score** | A 0 to 100 estimate from a fixed six-part rubric (sections, keywords, formatting, impact, clean content and **role fit**), shown as a breakdown with specific fixes. |
 | 🧩 | **Section-wise customization** | Choose which of Summary, Skills, Experience and Projects to change. Everything else stays exactly as you wrote it. |
 | ✉️ | **Cover letter** | Generated on demand from the job and your tailored resume, then fact-checked against your original and rewritten once if anything is unsupported. Streams in, then downloads as a PDF. |
 | ⚡ | **Streaming** | A live step-by-step timeline while the agents work, over Server-Sent Events. |
-| 🔐 | **Accounts and history** | Username and password login. Every run is saved, with view, re-download, **re-run with different sections**, and delete. |
+| 🔐 | **Accounts and history** | Username and password login. Every run is saved with your edits, with view, re-download, **re-run with different sections**, and delete. |
 | 🧪 | **Fact-check guardrail** | A dedicated agent flags anything the original resume doesn't support and triggers one automatic revision. Anything still flagged goes back to your original wording by default. |
 | 📊 | **Admin panel** | Users, guests, runs, LLM calls, tokens and estimated cost. |
 
@@ -118,9 +118,10 @@ flowchart LR
 2. **An independent fact-check.** A separate guardrail agent compares the draft with your original. It flags new skills, changed numbers, and inflated scope ("contributed" turning into "led").
 3. **One self-correction loop.** If the guardrail finds real problems, the supervisor sends the flagged items back to the customizer for one revision.
 4. **Unsupported lines never reach your PDF by default.** Anything still flagged after that is put back to your original wording (or removed, if it has no source), before the scores are computed. The customizer reports which original bullet each rewrite came from, so only the flagged line changes. You can still choose *Keep rewrite* for any of them.
-5. **The cover letter is checked too.** A second guardrail compares the letter with your original resume and flags invented tools, practices and inflated depth ("deep hands-on experience"). The letter is rewritten once without them; anything left is shown under it.
-6. **Structured outputs everywhere.** Every agent returns schema-validated JSON (Pydantic), so the UI never parses free text. A code-level safety net also keeps the original section if a rewrite ever drops or adds a whole role.
-7. **Resilience.** Gemini calls retry on rate limits, server errors and timeouts (3 attempts, exponential backoff with jitter). A step that still fails is recorded, and the rest of the run carries on, so you get **partial results** instead of a blank error page.
+5. **The cover letter is checked too.** A second guardrail compares the letter with your original resume and flags invented tools, practices, inflated depth ("deep hands-on experience") and the duties of the job you are applying for recast as your past work. The letter is rewritten once without them; anything left is highlighted in the editor, listed in its own Fact-check card and stored with the letter, so you can edit it out before you download.
+6. **Honest about what was checked.** Every agent is told today's date, so durations ("Jan 2022 to Present") are counted correctly. The Fact-check cards say "AI version fact-checked" and, once you change something, how many lines you edited and that your edits are not checked. A letter that was never checked says so.
+7. **Structured outputs everywhere.** Every agent returns schema-validated JSON (Pydantic), so the UI never parses free text. A code-level safety net also keeps the original section if a rewrite ever drops or adds a whole role.
+8. **Resilience.** Gemini calls retry on rate limits, server errors and timeouts (3 attempts, exponential backoff with jitter). A step that still fails is recorded, and the rest of the run carries on, so you get **partial results** instead of a blank error page.
 
 All the system prompts are versioned plain-text files in
 [`packages/agents/src/agents/prompts/`](packages/agents/src/agents/prompts/).
@@ -150,7 +151,7 @@ sequenceDiagram
     G-->>A: Final result
     A->>D: Save to history (users), record token usage
     A-->>W: SSE: result
-    W-->>U: Scores, side-by-side resumes, PDF download
+    W-->>U: Scores and fact-check, an editable resume and letter, PDF download
 ```
 
 ## Architecture
@@ -164,7 +165,7 @@ flowchart TB
     subgraph API["FastAPI (Python 3.12)"]
         R["/api/v1 routers<br/>customize · cover-letter · auth · history · admin"]
         SV["Services<br/>PDF parsing · guest gate · JWT and refresh · rate limits · usage"]
-        AG["packages/agents<br/>LangGraph supervisor + 7 workers"]
+        AG["packages/agents<br/>LangGraph supervisor + 9 workers"]
         DB["packages/db<br/>Beanie ODM models"]
     end
 
@@ -181,7 +182,7 @@ It's a monorepo with one deployable per app and shared packages. The PRD's `fron
 
 | Path | What it is |
 |---|---|
-| `apps/web` | Next.js frontend: form, live progress, results, history, admin |
+| `apps/web` | Next.js frontend: form, live progress, the editing workspace, history, admin |
 | `apps/api` | FastAPI backend: validation, PDF parsing, auth, streaming, persistence |
 | `packages/agents` | The LangGraph graph, LangChain agents, prompts, retries and usage tracking |
 | `packages/db` | MongoDB models (Beanie) and the connection helper |
@@ -315,7 +316,7 @@ All backend settings come from `apps/api/.env`. A key with no value (`KEY=`) cou
 | `LANGSMITH_TRACING` | | `false` | Turn LangSmith tracing on or off (same setup in dev and prod) |
 | `LANGSMITH_API_KEY` | | | LangSmith key |
 | `LANGSMITH_PROJECT` | | `patrashilpi` | LangSmith project name |
-| `LANGSMITH_AGENT_ID` · `LANGSMITH_AGENT_ENVIRONMENT` | | | Group traces under an agent in LangSmith's Agents view |
+| `LANGSMITH_AGENT_ID` · `LANGSMITH_AGENT_ENVIRONMENT` | | | Send traces to an agent in LangSmith's Agents view (`local`, `development`, `staging` or `production`). When the agent ID is set, `LANGSMITH_PROJECT` is ignored: LangSmith accepts only one destination per run |
 | `LANGSMITH_ENDPOINT` | | US default | Your workspace's regional endpoint (e.g. `https://apac.api.smith.langchain.com`) |
 
 </details>
@@ -363,7 +364,7 @@ Every backend route lives under **`/api/v1`**. Errors always have the same shape
 |---|---|---|---|
 | `GET` | `/healthcheck` | | Service and database status |
 | `POST` | `/customize` | guest or user | Multipart: `jd_text`, `sections[]`, `resume` (PDF), `fingerprint`. **SSE stream** |
-| `POST` | `/cover-letter` | user | JSON: `jd_text`, `customized_resume`, `run_id?`. **SSE stream** |
+| `POST` | `/cover-letter` | user | JSON: `jd_text`, `customized_resume`, `original_resume?` (what the letter is fact-checked against), `jd_analysis?` (saves a call), `run_id?`. **SSE stream**; the result carries `letter_issues` and `letter_index` |
 | `POST` | `/auth/register` | | Create an account and log in |
 | `POST` | `/auth/login` | | Log in (sets httpOnly cookies) |
 | `POST` | `/auth/refresh` | refresh cookie | Rotate the session |
@@ -377,8 +378,9 @@ Every backend route lives under **`/api/v1`**. Errors always have the same shape
 | `POST` | `/admin/login` · `/admin/login/keyword` | | Admin login (password or keyword) |
 | `GET` | `/admin/stats` · `/admin/users` | admin | Dashboard totals, users with run counts |
 
-**Streaming events:** `progress` (step started, done or failed), `token`, `token_reset` (a retry
-began), then exactly one `result` or `error`.
+**Streaming events:** `plan` (the steps this run will take), `progress` (step started, done or
+failed, with a one-line result), `token`, `token_reset` (a retry or a rewrite began), then
+exactly one `result` or `error`.
 
 ## Project structure
 
@@ -394,21 +396,21 @@ began), then exactly one `result` or `error`.
 │   └── web/                      Next.js frontend
 │       └── src/
 │           ├── app/              / (landing), /customize, /results, /login, /register, /history, /admin
-│           ├── components/       form, results, history, admin, ui
+│           ├── components/       form, workspace (resume and letter editors), results, history, admin, ui
 │           ├── context/          run and auth state
-│           ├── lib/              API client, SSE parser, zod schemas, session refresh
-│           └── pdf/              resume and cover letter PDF templates
+│           ├── lib/              API client, SSE parser, zod schemas, edit and highlight helpers
+│           └── pdf/              resume and cover letter PDF templates (embedded Inter font)
 ├── packages/
 │   ├── agents/src/agents/        graph, supervisor, workers/, prompts/*.md, retry, usage
 │   └── db/src/db/                Beanie models (+ admin/ collections)
-├── tests/data/jd.txt             sample job descriptions
+├── tests/data/                   sample job descriptions and a fictional sample resume
 ├── pyproject.toml / uv.lock      uv workspace
 └── dev-docs/PRD.md               the original brief
 ```
 
 ## Security and privacy
 
-- **Your PDF is never stored.** It is parsed in memory and only the extracted text is kept, and only for logged-in users' history.
+- **Your PDF is never stored.** It is parsed in memory and only the extracted text is kept, and only for logged-in users' history. For logged-in users, your edits to a resume or letter are saved with the run too, next to the AI's version. Guests keep nothing.
 - **Sessions:** a short-lived JWT access token plus an opaque refresh token, both in `httpOnly` cookies. The refresh token is stored only as a hash, is single-use, and its cookie is only sent to `/api/v1/auth`.
 - **Passwords:** bcrypt over a SHA-256 pre-hash, so long passwords are not silently cut at bcrypt's 72-byte limit. Login says whether the username or the password was wrong (sign-up already reveals taken usernames).
 - **Brute force:** 5 failed logins per 15 minutes (per IP and username), 10 sign-ups per hour per IP, and the same lock on admin login.
@@ -462,8 +464,8 @@ server for server rendering).
 | Cost and latency | **6 Gemini requests** per clean run (5 chat + 1 embedding); a revision adds 3 | The step order is fixed in code and the supervisor LLM only decides revisions. Free-tier rate limits are absorbed by retries |
 | Rate limits | **In-memory**, per process | Fine for a single instance. Multiple instances would need Redis or Mongo-backed limits |
 | Guest limit | Bypassable by a different browser or by clearing data | Fingerprinting is best-effort by design. Logged-in use is the real path |
-| History | Stores the ATS *score* but not the full notes, keyword gaps or fact-check flags, and a saved letter's flags are not kept | A scope decision. The customized resume, your edits, scores and cover letters are kept, and the AI's versions are kept next to your edits so you can reset |
-| Cover letter check | The letter is fact-checked by an LLM, so a loosely worded claim can slip through | Flags are highlighted and stored with the letter; you can edit any phrase out. Your own edits are never fact-checked, and the page says so |
+| History | Stores the ATS *score* but not its full notes, the keyword gaps or the resume's fact-check flags | A scope decision. The customized resume, your edits, scores and cover letters (with their fact-check flags) are kept, and the AI's versions are kept next to your edits so you can reset |
+| Fact-checks | Both checks are done by an LLM, so a loosely worded claim can slip through (and a true one is occasionally flagged) | Flags are highlighted in place, you can edit any of them out, and every restored line can be switched back. Your own edits are never fact-checked, and the page says so |
 | Editing | Edits are kept in the tab (and saved to history for logged-in users); guests lose them when the tab closes | Guests have no account to save to |
 | Accounts | No password reset (no email) | Usernames, not emails, by design. The register page says so |
 | Streaming UI | Shows a step timeline, not live tokens | The customizer streams JSON, so a timeline reads better |

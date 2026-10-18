@@ -26,6 +26,21 @@ A running log of notable changes to PatraShilpi, newest first.
 - Today's date is now given to every agent, so "Jan 2022 to Present" is counted correctly and "four years" is no longer flagged.
 - The cover-letter check no longer flags the title of the job being applied for as a claim.
 
+### Sidebar redesign
+
+- **Scores:** two ring gauges (match and ATS), colour-coded breakdown bars, and a collapsible list of suggestions.
+- **Missing keywords:** grouped into *Required* and *Preferred* chips; pick one to see where it could go.
+
+### Truthfulness and the PDF
+
+- **Unsupported lines no longer reach your PDF.** After the fact-check (and its one revision), any line still flagged is restored to your original wording, or removed if it has no source, before the scores are computed. The customizer now reports which original bullet each rewrite came from. Each restore can be switched back with *Keep rewrite*. This step is plain code and costs no model call.
+- **Cover letters are fact-checked** against your original resume and rewritten once if they invent tools, practices or duties of the target role (a software engineer applying for a product manager job is the hard case). Anything left is highlighted for you to edit.
+- **ATS-safe PDF.** The Inter font is embedded (so "62 → 98" survives), headings have no letter spacing, words are never hyphenated, a heading is kept with the first entry of its section, and dates no longer overlap long titles.
+- **Parsing:** pdfplumber now keeps spaces in tightly set lines (`x_tolerance=1.5`), and long unbroken text wraps inside its card.
+- **ATS score consistency:** the model scores fixed criteria with written anchors at temperature 0, and the code adds them up.
+- **Test account:** `/qa` now uses a fictional sample resume instead of a real one.
+- **Notice banner:** an optional, dismissible site-wide banner, switched on with `NEXT_PUBLIC_NOTICE_BANNER=true`.
+
 ## 17 October 2026
 
 ### Fewer LLM calls per request: 14 → 6
@@ -42,6 +57,14 @@ A clean customization used to make 14 Gemini requests. It now makes **6**.
 - The LLM supervisor is now consulted only when the fact-check flags the draft, to decide whether to revise. A revision adds 3 calls.
 - A cover letter after a run now makes 1 call instead of 2, because the run's JD analysis is sent along with the request.
 - The checklist now shows 6 steps: JD, resume, customize, fact-check, evaluate, match.
+
+### Also on 17 October
+
+- **Demo video page** at `/demo-video`, embedding the YouTube video set in `NEXT_PUBLIC_DEMO_VIDEO_ID` (privacy-friendly embed; "coming soon" until it is set). Linked from the landing page, the footer and the README.
+- **Cold-start warm-up:** the site pings the API's healthcheck as soon as a page opens (once per tab), so a sleeping Render API is already waking by the time you click.
+- **LangSmith agent tracing:** traces go to an agent and environment (`LANGSMITH_AGENT_ID`, `LANGSMITH_AGENT_ENVIRONMENT`, `LANGSMITH_ENDPOINT` for non-US regions). A small custom tracer fixes LangSmith rejecting every run with *"address cannot be combined with session_id or session_name"*.
+- **Admin dashboard:** a *Registered admins* card.
+- **Every enabled button now shows the pointer cursor** (disabled ones keep the blocked cursor).
 
 ### Privacy copy made accurate
 
